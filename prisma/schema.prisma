@@ -1,0 +1,64 @@
+// This is your Prisma schema file.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Defines the possible statuses for a job application
+enum ApplicationStatus {
+  APPLIED
+  INTERVIEWING
+  OFFER
+  REJECTED
+}
+
+// Stores the user's static, non-changing information and master skills
+model UserProfile {
+  id           Int           @id @default(autoincrement())
+  name         String
+  phone        String
+  email        String        @unique
+  linkedinUrl  String
+  githubUrl    String
+  education    Json          // Store education details as JSON
+  leadership   Json          // Store leadership details as JSON
+  masterSkills Json          // e.g., {"React": 5, "Node.js": 4, "AWS": 2}
+  applications Application[] // Relation to all applications made by this user
+}
+
+// Stores a record for each job application
+model Application {
+  id                       Int               @id @default(autoincrement())
+  companyName              String
+  jobTitle                 String
+  appliedAt                DateTime          @default(now())
+  
+  // New fields for extended functionality
+  country                  String            // e.g., "Singapore", "Bangkok"
+  source                   String            // e.g., "LinkedIn", "Company Website"
+  contactEmail             String?           // Optional HR/Company email for follow-ups
+  followUp                 Boolean           @default(false)
+  skillMatchPercentage     Float?            // The calculated match % for follow-up logic
+  
+  // New fields for tracking and analytics
+  status                   ApplicationStatus @default(APPLIED)
+  statusUpdatedAt          DateTime?         // Date of the last status change (e.g., rejection date)
+  
+  jobDescription           String            @db.Text 
+  
+  generatedCvJson          Json
+  cvPdfFilename            String
+  cvThemeUsed              String            // e.g., "Classic", "Modern" to render the correct preview
+
+  generatedCoverLetterJson Json?             // Optional: for the cover letter
+  cvCoverLetterPdfFilename String?           // Optional: filename for the cover letter PDF
+
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
+  userProfileId Int
+}
