@@ -1,5 +1,4 @@
-// This is your Prisma schema file.
-// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -10,7 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Defines the possible statuses for a job application
 enum ApplicationStatus {
   APPLIED
   INTERVIEWING
@@ -18,7 +16,6 @@ enum ApplicationStatus {
   REJECTED
 }
 
-// Stores the user's static, non-changing information and master skills
 model UserProfile {
   id           Int           @id @default(autoincrement())
   name         String
@@ -26,38 +23,42 @@ model UserProfile {
   email        String        @unique
   linkedinUrl  String
   githubUrl    String
-  education    Json          // Store education details as JSON
-  leadership   Json          // Store leadership details as JSON
-  masterSkills Json          // e.g., {"React": 5, "Node.js": 4, "AWS": 2}
-  applications Application[] // Relation to all applications made by this user
+  education    Json
+  leadership   Json
+  masterSkills Json
+  applications Application[]
 }
 
-// Stores a record for each job application
 model Application {
   id                       Int               @id @default(autoincrement())
   companyName              String
   jobTitle                 String
   appliedAt                DateTime          @default(now())
   
-  // New fields for extended functionality
-  country                  String            // e.g., "Singapore", "Bangkok"
-  source                   String            // e.g., "LinkedIn", "Company Website"
-  contactEmail             String?           // Optional HR/Company email for follow-ups
+  country                  String
+  source                   String
+  contactEmail             String?
   followUp                 Boolean           @default(false)
-  skillMatchPercentage     Float?            // The calculated match % for follow-up logic
+  skillMatchPercentage     Float?
   
-  // New fields for tracking and analytics
   status                   ApplicationStatus @default(APPLIED)
-  statusUpdatedAt          DateTime?         // Date of the last status change (e.g., rejection date)
+  statusUpdatedAt          DateTime?         @updatedAt // Automatically update on change
   
-  jobDescription           String            @db.Text 
+  jobDescription           String            @db.Text
   
   generatedCvJson          Json
   cvPdfFilename            String
-  cvThemeUsed              String            // e.g., "Classic", "Modern" to render the correct preview
+  cvThemeUsed              String
 
-  generatedCoverLetterJson Json?             // Optional: for the cover letter
-  cvCoverLetterPdfFilename String?           // Optional: filename for the cover letter PDF
+  generatedCoverLetterJson Json?
+  cvCoverLetterPdfFilename String?
+
+  // <<<<<<< Follow-up System အတွက် Field အသစ်များ >>>>>>>>>
+  followUpDate             DateTime?         // Date to remind for follow-up
+  followUpCompleted        Boolean           @default(false) // Track if follow-up action is done
+
+  requiredSkills           String[]          @default([])
+  missingSkills            String[]          @default([])
 
   userProfile   UserProfile @relation(fields: [userProfileId], references: [id])
   userProfileId Int

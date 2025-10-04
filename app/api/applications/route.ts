@@ -1,69 +1,62 @@
-// File: app/api/applications/route.ts
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+// app/api/applications/route.ts
 
-// GET function to fetch all applications
+import prisma from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+// GET all applications
 export async function GET() {
   try {
     const applications = await prisma.application.findMany({
-      orderBy: {
-        appliedAt: 'desc', // Show the newest applications first
-      },
+      where: { userProfileId: 1 }, // This should be dynamic based on the authenticated user
+      orderBy: { appliedAt: "desc" },
     });
     return NextResponse.json(applications);
   } catch (error) {
-    console.error('Error fetching applications:', error);
-    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    console.error("Error fetching applications:", error);
+    return NextResponse.json({ error: "Failed to fetch applications" }, { status: 500 });
   }
 }
 
-
-// POST function to create a new application
+// <<<<<<< POST to create a new application (Made more robust) >>>>>>>>>
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const {
-      jobDescription,
-      generatedCvJson,
-      companyName,
-      jobTitle,
-      country,
-      source,
-      contactEmail,
-      cvThemeUsed
+      companyName, jobTitle, jobDescription, generatedCvJson,
+      cvThemeUsed, cvPdfFilename, country, source, contactEmail,
+      followUp, skillMatchPercentage, requiredSkills, missingSkills,
+      userProfileId, followUpDate
     } = body;
-    
-    // --- Generate Unique PDF Filename ---
-    const user = await prisma.userProfile.findFirst({ where: { id: 1 } });
-    if (!user) throw new Error("User profile not found");
-    
-    const sanitizedJobTitle = jobTitle.replace(/[^a-zA-Z0-9]/g, '');
-    const count = await prisma.application.count({
-      where: { jobTitle: jobTitle }
-    });
-    const cvPdfFilename = `${user.name.replace(/ /g, '')}_${sanitizedJobTitle}_${count + 1}.pdf`;
 
-    // --- Save to Database ---
-    const newApplication = await prisma.application.create({
+    if (!companyName || !jobTitle || !userProfileId || !generatedCvJson) {
+      return NextResponse.json({ error: "Missing required fields for application." }, { status: 400 });
+    }
+
+    const application = await prisma.application.create({
       data: {
         companyName,
         jobTitle,
         jobDescription,
         generatedCvJson,
-        cvPdfFilename,
         cvThemeUsed,
+        cvPdfFilename,
         country,
         source,
-        contactEmail: contactEmail || null,
-        userProfileId: 1, // Hardcoded for single user
-      }
+        contactEmail,
+        followUp,
+        skillMatchPercentage,
+        requiredSkills,
+        missingSkills,
+        userProfileId,
+        followUpDate,
+        // Ensure boolean defaults are handled if not provided
+        followUpCompleted: false,
+      },
     });
 
-    return NextResponse.json(newApplication, { status: 201 });
-
+    return NextResponse.json(application, { status: 201 });
   } catch (error) {
-    console.error('Error saving application:', error);
-    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    console.error("Error creating application:", error);
+    return NextResponse.json({ error: "Failed to create application" }, { status: 500 });
   }
 }
-

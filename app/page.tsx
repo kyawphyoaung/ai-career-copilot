@@ -1,163 +1,317 @@
-// File: app/page.tsx
-'use client';
+// app/page.tsx
 
-import { useState, useRef } from 'react';
-import CvPreview from '@/components/CvPreview';
+"use client";
 
-export default function DashboardPage() {
-  // --- States for CV Generation ---
-  const [jobDescription, setJobDescription] = useState('');
+import { useState, useEffect, useRef } from "react";
+import Editor from "react-simple-code-editor";
+import { highlight, languages } from "prismjs";
+import "prismjs/components/prism-json";
+import CvPreview from "@/components/CvPreview";
+import { sampleCvJson } from "@/lib/sample-cv";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+export default function HomePage() {
+  const [jd, setJd] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [jsonText, setJsonText] = useState("");
   const [generatedCv, setGeneratedCv] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cvTheme, setCvTheme] = useState('modern');
+  const [cvScale, setCvScale] = useState(1);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const cvPreviewRef = useRef<HTMLDivElement>(null);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [applicationSource, setApplicationSource] = useState("LinkedIn");
+  const [applicationCountry, setApplicationCountry] = useState("Singapore");
+  const [contactEmail, setContactEmail] = useState("");
+  const [wantsFollowUp, setWantsFollowUp] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState("");
+  const [skillAnalysis, setSkillAnalysis] = useState<{ match: number; required: string[]; missing: string[] } | null>(null);
+  const [cvPdfFilename, setCvPdfFilename] = useState("");
 
-  // --- States for Saving Application ---
-  const [appDetails, setAppDetails] = useState({
-      companyName: '',
-      jobTitle: '',
-      country: 'Singapore',
-      source: 'LinkedIn',
-      contactEmail: ''
-  });
-  const [cvTheme, setCvTheme] = useState('template2');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
 
-  const handleAppDetailsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { name, value } = e.target;
-      setAppDetails(prev => ({ ...prev, [name]: value }));
+  useEffect(() => {
+    if (jsonText) {
+      try {
+        const parsedJson = JSON.parse(jsonText);
+        setGeneratedCv(parsedJson);
+        const name = parsedJson?.personalInfo?.name?.replace(/\s+/g, '_') || 'CV';
+        const company = companyName.replace(/\s+/g, '_') || 'Resume';
+        const timestamp = Date.now();
+        setCvPdfFilename(`${name}_${company}_${timestamp}.pdf`);
+        setJsonError(null);
+      } catch (e) {
+        setJsonError("Invalid JSON format.");
+        setGeneratedCv(null);
+      }
+    } else {
+      setGeneratedCv(null);
+      setJsonError(null);
+    }
+  }, [jsonText, companyName]);
+
+  useEffect(() => {
+    const calculateScale = () => {
+      if (previewContainerRef.current) {
+        const containerWidth = previewContainerRef.current.offsetWidth;
+        const a4WidthInPx = 210 * (96 / 25.4);
+        const scale = (containerWidth * 0.95) / a4WidthInPx;
+        setCvScale(scale > 1 ? 1 : scale);
+      }
+    };
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, []);
+  
+  const handleGenerateCommonCv = () => {
+    const transformedCv = JSON.parse(JSON.stringify(sampleCvJson));
+    const skillsObject = transformedCv.skills;
+    const skillsArray = Object.entries(skillsObject).map(([category, items]) => ({
+      category,
+      items: Array.isArray(items) ? items.join(', ') : String(items)
+    }));
+    const experienceArray = transformedCv.experience.map((exp: any) => ({
+      ...exp,
+      responsibilities: Array.isArray(exp.responsibilities) ? exp.responsibilities.join('\n') : String(exp.responsibilities)
+    }));
+    transformedCv.skills = skillsArray;
+    transformedCv.experience = experienceArray;
+    setJsonText(JSON.stringify(transformedCv, null, 2));
+    setSkillAnalysis(null);
+    setError(null);
   };
 
-  const handleGenerateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    setGeneratedCv(null);
+  const handleGenerateTailoredCv = async () => {
+    if (!jd.trim()) {
+      setError("Job Description cannot be empty.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setJsonText("");
+    setSkillAnalysis(null);
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobDescription }),
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobDescription: jd, companyName, jobTitle }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate CV');
-      }
-
+      if (!response.ok) throw new Error("Failed to generate CV.");
       const data = await response.json();
-      setGeneratedCv(data);
-      
-      // *** NEW: Auto-fill the save form with AI-generated data ***
-      if (data.experience && data.experience.length > 0) {
-        setAppDetails(prev => ({
-            ...prev,
-            jobTitle: data.experience[0].title || 'Software Engineer',
-            companyName: data.experience[0].company || ''
-        }));
-      }
-
+      setJsonText(JSON.stringify(data.generatedCvJson, null, 2));
+      if(data.skillAnalysis) setSkillAnalysis(data.skillAnalysis);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+  
+  const handleDownloadPdf = async () => {
+    const cvElement = cvPreviewRef.current;
+    if (!cvElement) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // <<<<<<< PDF Generation Error Fix >>>>>>>>>
+      const canvas = await html2canvas(cvElement, { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        backgroundColor: '#ffffff' // Force a solid, parsable background color
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+      pdf.save(cvPdfFilename);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setError("Could not generate PDF. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSaveApplication = async () => {
-    if (!generatedCv) return;
-    setIsSaving(true);
-    setSaveMessage('');
+      if (!generatedCv) {
+          setError("No CV data to save.");
+          return;
+      }
+      setLoading(true);
+      setError(null);
+      setSaveSuccessMessage("");
 
-    const payload = {
-        ...appDetails,
-        jobDescription,
-        generatedCvJson: generatedCv,
-        cvThemeUsed: cvTheme
-    };
+      let followUpDate = null;
+      if (wantsFollowUp) {
+          followUpDate = new Date();
+          followUpDate.setDate(followUpDate.getDate() + 7);
+      }
 
-    try {
-        const response = await fetch('/api/applications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) throw new Error('Failed to save application');
+      try {
+          const payload = {
+              companyName, jobTitle, jobDescription: jd, generatedCvJson: generatedCv,
+              cvThemeUsed: cvTheme, cvPdfFilename, country: applicationCountry,
+              source: applicationSource, contactEmail, followUp: wantsFollowUp,
+              skillMatchPercentage: skillAnalysis?.match || 0,
+              requiredSkills: skillAnalysis?.required || [],
+              missingSkills: skillAnalysis?.missing || [],
+              userProfileId: 1,
+              followUpDate: followUpDate,
+          };
+          const response = await fetch('/api/applications', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+          });
 
-        setSaveMessage('Application saved successfully!');
-    } catch (err) {
-        setSaveMessage('Error saving application.');
-    } finally {
-        setIsSaving(false);
-    }
-  }
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Failed to save.');
+          }
+          setSaveSuccessMessage("Application saved!");
+          setTimeout(() => {
+              setIsSaveModalOpen(false);
+              setSaveSuccessMessage("");
+          }, 2000);
+      } catch (err: any) {
+          setError(err.message);
+      } finally {
+          setLoading(false);
+      }
+  };
 
   return (
-    <div className="p-8 h-full">
-      <h1 className="text-3xl font-bold mb-6 text-white">CV Generator Dashboard</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-100px)]">
-        {/* Left Panel: Input */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col">
-          <form onSubmit={handleGenerateSubmit} className="flex flex-col h-full">
-            <label htmlFor="jobDescription" className="block text-xl font-semibold mb-4 text-white">
-              1. Paste Job Description
-            </label>
+    <main className="flex flex-col h-[calc(100vh-65px)]">
+      <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 overflow-hidden">
+        {/* Left Side */}
+        <div className="flex flex-col gap-4 overflow-y-auto pr-2">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h2 className="text-lg font-semibold mb-2">1. Job Details</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+               <input type="text" placeholder="Company Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600"/>
+               <input type="text" placeholder="Job Title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600"/>
+            </div>
             <textarea
-              id="jobDescription"
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              className="w-full flex-grow p-4 border border-gray-600 bg-gray-700 text-gray-200 rounded font-mono text-sm"
-              placeholder="Paste the full job description from LinkedIn, etc."
+              className="w-full p-2 border rounded h-32 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
+              placeholder="Paste the Job Description here..."
+              value={jd}
+              onChange={(e) => setJd(e.target.value)}
             />
-            <button
-              type="submit"
-              disabled={isLoading || !jobDescription}
-              className="mt-6 w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Generating...' : 'Generate Tailored CV'}
-            </button>
-            {error && <p className="mt-4 text-red-400">{error}</p>}
-          </form>
+            {error && <p className="text-red-500 mt-2">{error}</p>}
+            <div className="flex gap-4 mt-2">
+                <button onClick={handleGenerateTailoredCv} disabled={loading} className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:bg-blue-400">
+                    {loading ? "Processing..." : "Generate Tailored CV (AI)"}
+                </button>
+                <button onClick={handleGenerateCommonCv} disabled={loading} className="w-full bg-gray-600 text-white p-2 rounded hover:bg-gray-700 disabled:bg-gray-400">
+                    Generate Common CV
+                </button>
+            </div>
+          </div>
+          <div className="bg-[#2d2d2d] p-4 rounded-lg shadow flex-grow flex flex-col">
+            <h2 className="text-lg font-semibold mb-2 text-gray-200">2. CV Data (JSON Editor)</h2>
+            <div className="editor-container relative flex-grow overflow-y-auto rounded-md" style={{fontFamily: '"Fira code", "Fira Mono", monospace', fontSize: 14}}>
+                 <Editor
+                    value={jsonText}
+                    onValueChange={code => setJsonText(code)}
+                    highlight={code => highlight(code, languages.json, 'json')}
+                    padding={10}
+                    style={{ minHeight: '100%', backgroundColor: '#2d2d2d', color: '#f8f8f2' }}
+                />
+            </div>
+             {jsonError && <p className="text-yellow-400 mt-2 text-sm">{jsonError}</p>}
+          </div>
         </div>
 
-        {/* Right Panel: Output & Save */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col">
-          <h2 className="text-xl font-semibold mb-4 text-white">2. Review & Save Application</h2>
-          <div className="flex-grow h-0">
-             <CvPreview 
-                cvData={generatedCv} 
-                onTemplateChange={setCvTheme} 
-             />
+        {/* Right Side */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow overflow-y-auto flex flex-col">
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+              <h2 className="text-lg font-semibold">3. CV Preview</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">Theme:</span>
+                  <button onClick={() => setCvTheme('modern')} className={`px-3 py-1 text-sm rounded ${cvTheme === 'modern' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>Modern</button>
+                  <button onClick={() => setCvTheme('classic')} className={`px-3 py-1 text-sm rounded ${cvTheme === 'classic' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>Classic</button>
+                   {generatedCv && (
+                     <>
+                      <button onClick={handleDownloadPdf} disabled={loading} className="px-3 py-1 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400">
+                          {loading ? '...' : 'Download PDF'}
+                      </button>
+                       <button onClick={() => setIsSaveModalOpen(true)} disabled={loading} className="px-3 py-1 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400">
+                           Save Application
+                       </button>
+                     </>
+                  )}
+              </div>
           </div>
-          {generatedCv && (
-            <div className="mt-4 pt-4 border-t border-gray-700">
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <input type="text" name="companyName" value={appDetails.companyName} onChange={handleAppDetailsChange} placeholder="Company Name" className="p-2 bg-gray-700 rounded border border-gray-600 text-white"/>
-                    <input type="text" name="jobTitle" value={appDetails.jobTitle} onChange={handleAppDetailsChange} placeholder="Job Title" className="p-2 bg-gray-700 rounded border border-gray-600 text-white"/>
-                    <select name="country" value={appDetails.country} onChange={handleAppDetailsChange} className="p-2 bg-gray-700 rounded border border-gray-600 text-white">
-                        <option>Singapore</option>
-                        <option>Bangkok</option>
-                        <option>Other</option>
-                    </select>
-                     <select name="source" value={appDetails.source} onChange={handleAppDetailsChange} className="p-2 bg-gray-700 rounded border border-gray-600 text-white">
-                        <option>LinkedIn</option>
-                        <option>Company Website</option>
-                        <option>JobStreet</option>
-                        <option>Email</option>
-                    </select>
-                    <input type="email" name="contactEmail" value={appDetails.contactEmail} onChange={handleAppDetailsChange} placeholder="HR Email (Optional)" className="p-2 bg-gray-700 rounded border border-gray-600 col-span-2 text-white"/>
-                </div>
-                <button onClick={handleSaveApplication} disabled={isSaving} className="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-gray-500">
-                    {isSaving ? 'Saving...' : 'Confirm & Save Application to History'}
-                </button>
-                {saveMessage && <p className="mt-2 text-center text-green-400">{saveMessage}</p>}
-            </div>
-          )}
+           <div 
+              ref={previewContainerRef}
+              className="flex-grow flex justify-center items-start pt-4 bg-gray-200 dark:bg-gray-700 rounded-md overflow-hidden"
+            >
+              {generatedCv ? (
+                  <div style={{ transform: `scale(${cvScale})`, transformOrigin: 'top center' }}>
+                    <CvPreview ref={cvPreviewRef} cvData={generatedCv} theme={cvTheme} />
+                  </div>
+              ) : (
+                  <div className="text-center py-10 text-gray-500 flex items-center justify-center h-full">
+                      <p>CV Preview will appear here.</p>
+                  </div>
+              )}
+           </div>
         </div>
       </div>
-    </div>
+
+      {/* Save Application Modal */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold mb-4">Save Application Details</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium">CV Filename</label>
+                <input type="text" value={cvPdfFilename} onChange={(e) => setCvPdfFilename(e.target.value)} className="mt-1 w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600"/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Country</label>
+                <input type="text" value={applicationCountry} onChange={(e) => setApplicationCountry(e.target.value)} className="mt-1 w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600"/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Source</label>
+                 <select value={applicationSource} onChange={(e) => setApplicationSource(e.target.value)} className="mt-1 w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
+                    <option>LinkedIn</option>
+                    <option>Company Website</option>
+                    <option>Job Board</option>
+                    <option>Referral</option>
+                    <option>Other</option>
+                 </select>
+              </div>
+              <div>
+                 <label className="block text-sm font-medium">Contact Email (Optional)</label>
+                <input type="email" placeholder="hr@example.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="mt-1 w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600"/>
+              </div>
+              <div className="flex items-center">
+                 <input type="checkbox" id="followUp" checked={wantsFollowUp} onChange={(e) => setWantsFollowUp(e.target.checked)} className="h-4 w-4 text-indigo-600 border-gray-300 rounded"/>
+                 <label htmlFor="followUp" className="ml-2 block text-sm">Set a reminder to follow up</label>
+              </div>
+            </div>
+            {error && <p className="text-red-500 mt-4">{error}</p>}
+            {saveSuccessMessage && <p className="text-green-500 mt-4">{saveSuccessMessage}</p>}
+            <div className="mt-6 flex justify-end gap-4">
+              <button onClick={() => setIsSaveModalOpen(false)} className="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">
+                Cancel
+              </button>
+              <button onClick={handleSaveApplication} disabled={loading} className="px-4 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400">
+                {loading ? 'Saving...' : 'Save Application'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
 

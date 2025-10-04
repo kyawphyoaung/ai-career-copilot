@@ -1,186 +1,145 @@
-// File: components/CvPreview.tsx
-'use client';
+// components/CvPreview.tsx
 
-import { useState, forwardRef, useEffect } from 'react';
+import React from 'react';
 
-// Define the props for the component
-interface CvPreviewProps {
-  cvData: any;
-  // Make onTemplateChange optional for read-only views
-  onTemplateChange?: (template: string) => void;
-  // Allow passing an initial template
-  initialTemplate?: string; 
+// CV data အတွက် TypeScript interface များ သတ်မှတ်ခြင်း
+interface PersonalInfo {
+  name: string;
+  phone: string;
+  email: string;
+  linkedinUrl: string;
+  githubUrl: string;
 }
 
-const CvPreview = forwardRef<HTMLDivElement, CvPreviewProps>(({ cvData, onTemplateChange, initialTemplate = 'template2' }, ref) => {
-  const [activeTemplate, setActiveTemplate] = useState(initialTemplate);
+interface Experience {
+  jobTitle: string;
+  companyName: string;
+  duration: string;
+  responsibilities: string;
+}
 
-  useEffect(() => {
-      setActiveTemplate(initialTemplate);
-  }, [initialTemplate]);
+interface Skill {
+  category: string;
+  items: string;
+}
 
-  const handleTemplateChange = (template: string) => {
-    setActiveTemplate(template);
-    if(onTemplateChange) {
-        onTemplateChange(template);
-    }
+interface Education {
+    degree: string;
+    university: string;
+    duration: string;
+}
+
+interface Leadership {
+    organization: string;
+    role: string;
+    duration: string;
+    details: string;
+}
+
+interface CvData {
+  personalInfo: PersonalInfo;
+  summary: string;
+  skills: Skill[];
+  experience: Experience[];
+  education: Education[];
+  leadership: Leadership[];
+}
+
+interface CvPreviewProps {
+  cvData: CvData;
+  theme?: string;
+}
+
+// <<<<<<< Component ကို forwardRef ဖြင့် ပြင်ဆင်ရေးသားခြင်း >>>>>>>>>
+const CvPreview = React.forwardRef<HTMLDivElement, CvPreviewProps>(({ cvData, theme = 'modern' }, ref) => {
+  if (!cvData) return null;
+
+  const { personalInfo = {}, summary, skills = [], experience = [], education = [], leadership = [] } = cvData;
+  const { name, phone, email, linkedinUrl, githubUrl } = personalInfo;
+
+  const themeClasses = {
+    modern: {
+      container: 'font-sans',
+      header: 'bg-gray-800 text-white p-6 rounded-t-lg',
+      name: 'text-3xl font-bold',
+      contact: 'text-sm mt-2',
+      sectionTitle: 'text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-3',
+      body: 'p-6',
+    },
+    classic: {
+      container: 'font-serif',
+      header: 'text-center p-6 border-b-2 border-black',
+      name: 'text-4xl font-bold tracking-wider',
+      contact: 'text-md mt-2',
+      sectionTitle: 'text-xl font-bold uppercase tracking-wider border-b border-black pb-1 mb-3',
+      body: 'p-6',
+    },
   };
 
-  if (!cvData) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500">
-        <p>CV Preview will appear here...</p>
-      </div>
-    );
-  }
-
-  // Destructure with default values to prevent errors
-  const { name = '', contact = {}, summary = '', skills = [], experience = [], education = {}, leadership = {} } = cvData;
-
-  const contactLinks = `
-    <a href="mailto:${contact.email}" class="hover:underline">${contact.email}</a> | 
-    <a href="${contact.linkedin}" target="_blank" class="hover:underline">LinkedIn</a> | 
-    <a href="${contact.github}" target="_blank" class="hover:underline">GitHub</a>`;
-
-  let skillsHTML = `<div class="section skills-section"><h2 class="section-title">Skills</h2><div class="skills-container">` +
-    (skills?.map((s: any) => `
-        <div class="skill-category">
-            <h3>${s.category}</h3>
-            <ul>${s.items.split(',').map((item: string) => `<li>${item.trim()}</li>`).join('')}</ul>
-        </div>`).join('') || '') +
-    `</div></div>`;
-
-  let experienceHTML = `<div class="section"><h2 class="section-title">Work Experience</h2>` +
-                       (experience?.map((job: any) => `
-                           <div class="job">
-                               <div class="job-header">
-                                   <h3 class="job-title">${job.title}</h3>
-                                   <span class="job-date">${job.date}</span>
-                               </div>
-                               <p class="job-company">${job.company}</p>
-                               <ul>${(job.points || []).map((p: string) => `<li>${p}</li>`).join('')}</ul>
-                           </div>`).join('') || '') +
-                       `</div>`;
-
-  let educationHTML = `<div class="section"><h2 class="section-title">Education</h2><div class="education-entry"><p><strong>${education.degree}</strong>, ${education.university} (${education.gradYear})</p><p>${education.gpa || ''}</p></div></div>`;
-  
-  let leadershipHTML = `<div class="section"><h2 class="section-title">Leadership</h2><p><strong>${leadership.role}</strong> (${leadership.organization || leadership.description}, ${leadership.date})</p></div>`;
-
-  let summaryHTML = `<div class="section"><h2 class="section-title">Professional Summary</h2><p class="summary-text">${summary}</p></div>`;
-  
-  let eduLeadHTML = `<div class="edu-lead-grid">${educationHTML}${leadershipHTML}</div>`;
-  
-  let finalHtml = '';
-
-    if (activeTemplate === 'template1') { // Classic
-        finalHtml = `
-        <style>
-            .cv-preview-content.template1 { font-family: 'Merriweather', serif; color: #212529; }
-            .cv-preview-content.template1 a { color: white; }
-            .cv-preview-content.template1 .header { text-align: center; background: #003366; color: white; padding: 20px 0;}
-            .cv-preview-content.template1 .header-content { padding: 0 1cm; }
-            .cv-preview-content.template1 h1 { margin: 0; font-size: 2.2em; }
-            .cv-preview-content.template1 .contact-info { margin-top: 8px; font-size: 0.9em;}
-            .cv-preview-content.template1 .content-body { padding: 15px 0 0 0; }
-            .cv-preview-content.template1 .section-title { color: #003366; font-size: 1.2em; border-bottom: 2px solid #003366; padding-bottom: 4px; margin-bottom: 8px; }
-            .cv-preview-content.template1 .job-header { display: flex; justify-content: space-between; align-items: baseline; }
-            .cv-preview-content.template1 .job-title { font-size: 1.05em; font-weight: bold; }
-            .cv-preview-content.template1 .job-company { font-style: italic; color: #212529; margin: 0 0 8px 0; }
-            .cv-preview-content.template1 ul { padding-left: 20px; }
-            .cv-preview-content.template1 .summary-text, .cv-preview-content.template1 p { color: #212529; }
-            .cv-preview-content.template1 .skills-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-            .cv-preview-content.template1 .skill-category h3 { margin-bottom: 6px; font-size: 1em; }
-            .cv-preview-content.template1 .skill-category ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; }
-            .cv-preview-content.template1 .skill-category li { background-color: #e9ecef; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; color: #212529; }
-            .cv-preview-content.template1 .edu-lead-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        </style>
-        <div class="header"><div class="header-content"><h1>${name}</h1><div class="contact-info">${contact.phone} | ${contactLinks}</div></div></div>
-        <div class="content-body">
-            ${summaryHTML}
-            ${skillsHTML}
-            ${experienceHTML}
-            ${eduLeadHTML}
-        </div>
-        `;
-    } else if (activeTemplate === 'template2') { // Modern
-        finalHtml = `
-        <style>
-            .cv-preview-content.template2 { display: flex; gap: 20px; font-family: 'Lato', sans-serif; color: #212529; }
-            .cv-preview-content.template2 a { color: #212529; text-decoration: none; }
-            .cv-preview-content.template2 .t2-header { text-align: left; margin-bottom: 15px;}
-            .cv-preview-content.template2 .t2-header h1 { font-size: 2.2em; color: #003366; margin: 0 0 5px 0; }
-            .cv-preview-content.template2 .t2-header .contact-info { font-size: 0.9em; color: #212529; }
-            .cv-preview-content.template2 .t2-main { flex: 2.5; }
-            .cv-preview-content.template2 .t2-sidebar { flex: 1.5; }
-            .cv-preview-content.template2 .section-title { font-size: 1.1em; color: #003366; border-bottom: 2px solid #003366; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase; }
-            .cv-preview-content.template2 .skill-category ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; }
-            .cv-preview-content.template2 .skill-category li { background-color: #e9ecef; color: #212529; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
-            .cv-preview-content.template2 .job ul { padding-left: 20px; color: #212529; }
-            .cv-preview-content.template2 .summary-text, .cv-preview-content.template2 p { color: #212529; }
-        </style>
-        <div class="t2-main">
-            <div class="t2-header"><h1>${name}</h1><div class="contact-info">${contact.phone} | ${contactLinks}</div></div>
-            ${summaryHTML}
-            ${experienceHTML}
-        </div>
-        <div class="t2-sidebar">
-            ${skillsHTML}
-            ${educationHTML}
-            ${leadershipHTML}
-        </div>`;
-    } else if (activeTemplate === 'template3') { // Minimalist
-        finalHtml = `
-        <style>
-            .cv-preview-content.template3 { font-family: 'Roboto', sans-serif; color: #212529; }
-            .cv-preview-content.template3 .header { text-align: left; padding-bottom: 10px; border-bottom: 2px solid #333; margin-bottom: 15px; }
-            .cv-preview-content.template3 h1 { font-size: 2.2em; margin: 0; }
-            .cv-preview-content.template3 .contact-info { margin-top: 5px; color: #212529; }
-            .cv-preview-content.template3 a { color: #212529; }
-            .cv-preview-content.template3 .section { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid #eee; }
-            .cv-preview-content.template3 .section:last-child { border-bottom: none; }
-            .cv-preview-content.template3 .section-title { font-size: 1em; text-transform: uppercase; letter-spacing: 2px; border: none; font-weight: bold; margin-bottom: 8px; }
-            .cv-preview-content.template3 ul { list-style-type: '- '; padding-left: 15px; }
-            .cv-preview-content.template3 .skill-category ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; }
-            .cv-preview-content.template3 .skill-category li { background-color: #e9ecef; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; color: #212529; }
-            .cv-preview-content.template3 .summary-text, .cv-preview-content.template3 p { color: #212529; }
-        </style>
-        <div class="header"><h1>${name}</h1><div class="contact-info">${contact.phone} | ${contactLinks}</div></div>
-        ${summaryHTML}
-        ${experienceHTML}
-        ${skillsHTML}
-        ${educationHTML}
-        ${leadershipHTML}
-        `;
-    }
+  const currentTheme = theme === 'classic' ? themeClasses.classic : themeClasses.modern;
 
   return (
-    <div className="h-full flex flex-col">
-        {/* Controls */}
-        <div className="flex-shrink-0 mb-4 p-2 bg-gray-700 rounded-lg flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-                <span className="font-semibold text-white">Template:</span>
-                <button onClick={() => handleTemplateChange('template1')} disabled={!onTemplateChange} className={`px-3 py-1 text-sm rounded ${activeTemplate === 'template1' ? 'bg-indigo-600 text-white' : 'bg-gray-600'} disabled:opacity-50`}>Classic</button>
-                <button onClick={() => handleTemplateChange('template2')} disabled={!onTemplateChange} className={`px-3 py-1 text-sm rounded ${activeTemplate === 'template2' ? 'bg-indigo-600 text-white' : 'bg-gray-600'} disabled:opacity-50`}>Modern</button>
-                <button onClick={() => handleTemplateChange('template3')} disabled={!onTemplateChange} className={`px-3 py-1 text-sm rounded ${activeTemplate === 'template3' ? 'bg-indigo-600 text-white' : 'bg-gray-600'} disabled:opacity-50`}>Minimalist</button>
+    // <<<<<<< Ref ကို root element တွင် ချိတ်ဆက်ခြင်း >>>>>>>>>
+    <div ref={ref} className={`cv-preview-a4 bg-white text-black shadow-lg mx-auto ${currentTheme.container}`}>
+      <header className={currentTheme.header}>
+        <h1 className={currentTheme.name}>{name}</h1>
+        <div className={currentTheme.contact}>
+          <span>{phone}</span> | <span>{email}</span> | <span>{linkedinUrl}</span> | <span>{githubUrl}</span>
+        </div>
+      </header>
+      <section className={currentTheme.body}>
+        <div>
+          <h2 className={currentTheme.sectionTitle}>Summary</h2>
+          <p>{summary}</p>
+        </div>
+        <div className="mt-4">
+          <h2 className={currentTheme.sectionTitle}>Skills</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {skills.map((skill, index) => (
+              <div key={index}>
+                <h3 className="font-bold">{skill.category}</h3>
+                <p>{skill.items}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4">
+          <h2 className={currentTheme.sectionTitle}>Experience</h2>
+          {experience.map((exp, index) => (
+            <div key={index} className="mb-4">
+              <h3 className="text-lg font-bold">{exp.jobTitle}</h3>
+              <p className="font-semibold">{exp.companyName} | {exp.duration}</p>
+              <ul className="list-disc list-inside mt-1">
+                {exp.responsibilities.split('\n').map((item, i) => item.trim() && <li key={i}>{item.trim()}</li>)}
+              </ul>
             </div>
-            <button onClick={() => window.print()} className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">
-                Download as PDF
-            </button>
+          ))}
         </div>
-
-        {/* A4 Preview Area */}
-        <div className="flex-grow bg-gray-500 overflow-y-auto p-4 rounded">
-            <div 
-                ref={ref}
-                id="cv-render-area" 
-                className="w-[210mm] min-h-fit bg-white p-[1cm] shadow-lg mx-auto"
-                dangerouslySetInnerHTML={{ __html: `<div class="cv-preview-content ${activeTemplate}">${finalHtml}</div>` }}
-            />
+         <div className="mt-4">
+          <h2 className={currentTheme.sectionTitle}>Education</h2>
+          {education.map((edu, index) => (
+            <div key={index} className="mb-2">
+              <h3 className="text-lg font-bold">{edu.degree}</h3>
+              <p className="font-semibold">{edu.university} | {edu.duration}</p>
+            </div>
+          ))}
         </div>
+        <div className="mt-4">
+          <h2 className={currentTheme.sectionTitle}>Leadership & Activities</h2>
+           {leadership.map((lead, index) => (
+            <div key={index} className="mb-2">
+              <h3 className="text-lg font-bold">{lead.organization} - <span className="font-semibold">{lead.role}</span></h3>
+               <p className="italic">{lead.duration}</p>
+              <p>{lead.details}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 });
 
-CvPreview.displayName = "CvPreview";
+CvPreview.displayName = 'CvPreview';
+
 export default CvPreview;
 

@@ -1,99 +1,107 @@
-// File: lib/gemini.ts
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+// lib/gemini.ts
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} from "@google/generative-ai";
 
-// Added safety settings to reduce the chance of the API blocking a response
+const MODEL_NAME = "gemini-1.0-pro";
+const API_KEY = process.env.GEMINI_API_KEY!;
+
+const genAI = new GoogleGenerativeAI(API_KEY);
+const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+const generationConfig = {
+  temperature: 0.9,
+  topK: 1,
+  topP: 1,
+  maxOutputTokens: 2048,
+};
+
 const safetySettings = [
-    {
-      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-    {
-      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-      threshold: HarmBlockThreshold.BLOCK_NONE,
-    },
-  ];
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+  },
+  // ... other safety settings
+];
 
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", safetySettings});
-
-export async function generateCvContent(jobDescription: string, userProfile: any): Promise<any> {
-  const masterSkillsString = Object.entries(userProfile.masterSkills)
-    .map(([skill, years]) => `${skill} (${years} years)`)
-    .join(", ");
-
-  // Providing more explicit work history context for the AI
-  const workHistoryContext = `
-    - Role: Software Engineer, Company: Singtel, Singapore
-    - Role: Full-stack Developer & Academic Coordinator, Company: Shwe Maw Kun Education Group
-  `;
-
+export async function generateCvContentForUser(
+  userProfile: any,
+  jobDescription: string
+) {
   const prompt = `
-    **Role:** You are an expert career coach and professional CV writer. Your task is to generate tailored CV content for a user applying for a specific job.
-
-    **Objective:** Create a complete CV JSON object with "summary", "skills", and "experience" sections that are highly relevant to the provided Job Description, based on the user's Master Skill Set and profile.
-
-    **Input Data:**
-
-    1.  **Job Description (JD):**
-        \`\`\`
-        ${jobDescription}
-        \`\`\`
-
-    2.  **User Profile:**
-        -   **Master Skill Set & Experience:** ${masterSkillsString}
-        -   **Past Work History (for context):** ${workHistoryContext}
-
-    **Instructions & Rules:**
-
-    1.  **Analyze the JD:** Identify the top 5-7 most critical technical skills and soft skills required for the job.
-    2.  **Generate "summary":** Write a powerful, concise professional summary (3-4 sentences) that directly addresses the JD's core requirements. Start with a strong title like "Results-driven Full-Stack Engineer" and incorporate the most important keywords from the JD. This section is mandatory.
-    3.  **Generate "skills":**
-        -   Create 3-4 skill categories (e.g., "Frontend & Web Technologies", "Backend & Databases", "Cloud & DevOps").
-        -   From the user's Master Skill Set, select ONLY the skills that are most relevant to the JD and populate these categories.
-        -   The output for each category's "items" must be a single comma-separated string (e.g., "React, Node.js, TypeScript"). This section is mandatory.
-    4.  **Generate "experience":**
-        -   For each of the user's past roles ("Software Engineer at Singtel", "Full-stack Developer at Shwe Maw Kun"), generate 2-3 achievement-oriented bullet points.
-        -   Each bullet point MUST directly map to a responsibility or requirement in the JD. Use metrics where possible (e.g., "improved performance by 15%", "reduced bugs by 40%").
-        -   **This section is mandatory.** Based on the JD and user skills, create relevant example achievements. For instance, if the JD asks for "CI/CD experience", a good bullet point would be: "Spearheaded the implementation of a new CI/CD pipeline at Singtel, reducing deployment time by 30%."
-    5.  **Output Format:** You MUST return ONLY a valid JSON object. Do not include any explanatory text, markdown formatting (like \`\`\`json), or anything outside of the JSON structure. The JSON object must have the following structure:
-        \`\`\`json
-        {
-          "summary": "string",
-          "skills": [
-            { "category": "string", "items": "string" }
-          ],
-          "experience": [
-            { "title": "string", "company": "string", "date": "string", "points": ["string", "string"] }
-          ]
-        }
-        \`\`\`
-
-    Now, generate the complete JSON content based on the provided data.
+    Based on the following user profile and job description, generate a tailored CV in JSON format.
+    User Profile: ${JSON.stringify(userProfile)}
+    Job Description: ${jobDescription}
+    The JSON output should follow this structure: { "contact": { "name": "...", "email": "...", "phone": "...", "linkedin": "...", "github": "...", "website": "..." }, "summary": "...", "experience": [{ "jobTitle": "...", "company": "...", "duration": "...", "responsibilities": ["...", "..."] }], "education": [{ "degree": "...", "institution": "...", "duration": "..." }], "skills": ["...", "..."] }
   `;
 
-  let text = '';
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    text = response.text();
-    // Clean the output to ensure it's a valid JSON string
-    const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonString);
-  } catch (error) {
-    console.error("Error calling or parsing Gemini API:", error);
-    console.error("--- Raw AI Response that caused error ---");
-    console.error(text); // Log the raw text for debugging
-    console.error("--------------------------------------");
-    throw new Error("Failed to generate content from AI. The response was not valid JSON. Please check the server console for details.");
-  }
+  const result = await model.generateContent(prompt);
+  const response = result.response;
+  const text = response.text();
+  return JSON.parse(text);
 }
 
+// <<<<<<< အသစ်ထပ်တိုးထားသော Function >>>>>>>>>
+/**
+ * Analyzes the job description against the user's skills to find gaps.
+ * @param masterSkills The user's list of master skills.
+ * @param jobDescription The job description text.
+ * @returns An object containing required skills, missing skills, and match percentage.
+ */
+export async function analyzeJobDescriptionAndSkills(
+  masterSkills: string[],
+  jobDescription: string
+): Promise<{
+  requiredSkills: string[];
+  missingSkills: string[];
+  skillMatchPercentage: number;
+}> {
+  const prompt = `
+    Analyze the following job description and compare it against the user's master skills.
+    
+    User's Master Skills: ${JSON.stringify(masterSkills)}
+    
+    Job Description: "${jobDescription}"
+
+    Your task is to:
+    1.  Identify and extract the key technical skills, tools, and programming languages required by the job description.
+    2.  Compare this list of required skills with the user's master skills.
+    3.  Identify which of the required skills the user is missing.
+    4.  Calculate a skill match percentage. The formula should be: (Number of Matching Skills / Total Number of Required Skills) * 100.
+    
+    Provide the output ONLY in a valid JSON format, with no other text before or after the JSON block.
+    The JSON object must have these exact keys: "requiredSkills", "missingSkills", "skillMatchPercentage".
+    
+    Example output:
+    {
+      "requiredSkills": ["React", "Node.js", "PostgreSQL", "AWS", "TypeScript"],
+      "missingSkills": ["AWS", "PostgreSQL"],
+      "skillMatchPercentage": 60
+    }
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    // Clean the text to ensure it's a valid JSON string
+    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsedResult = JSON.parse(cleanedText);
+    
+    // Ensure the percentage is a number
+    parsedResult.skillMatchPercentage = Number(parsedResult.skillMatchPercentage) || 0;
+
+    return parsedResult;
+  } catch (error) {
+    console.error("Error analyzing job description with Gemini:", error);
+    // Return a default empty state in case of an error
+    return {
+      requiredSkills: [],
+      missingSkills: [],
+      skillMatchPercentage: 0,
+    };
+  }
+}
