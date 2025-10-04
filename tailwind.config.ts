@@ -1,13 +1,15 @@
+// tailwind.config.ts
+
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  // <<<<<<< Dark Mode ကို class အလိုက် ထိန်းချုပ်ရန် >>>>>>>>>
+  darkMode: 'class',
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  // <<<<<<< Dark Mode ကို class အလိုက် ထိန်းချုပ်ရန် >>>>>>>>>
-  darkMode: 'class', 
   theme: {
     extend: {
       backgroundImage: {
@@ -24,4 +26,6 @@ const config: Config = {
   },
   plugins: [],
 };
+
 export default config;
+

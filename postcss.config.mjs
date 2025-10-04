@@ -1,12 +1,11 @@
 // postcss.config.mjs
 
+/** @type {import('postcss-load-config').Config} */
 const config = {
   plugins: {
-    // Use the new, correct package as requested by the error message
-    '@tailwindcss/postcss': {},
-    'autoprefixer': {},
+    tailwindcss: {},
+    autoprefixer: {},
   },
 };
 
-export default config;
-
+module.exports = config;
