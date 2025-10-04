@@ -23,7 +23,7 @@ const safetySettings = [
     },
   ];
 
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", safetySettings});
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", safetySettings});
 
 export async function generateCvContent(jobDescription: string, userProfile: any): Promise<any> {
   const masterSkillsString = Object.entries(userProfile.masterSkills)

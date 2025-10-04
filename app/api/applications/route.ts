@@ -2,6 +2,23 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// GET function to fetch all applications
+export async function GET() {
+  try {
+    const applications = await prisma.application.findMany({
+      orderBy: {
+        appliedAt: 'desc', // Show the newest applications first
+      },
+    });
+    return NextResponse.json(applications);
+  } catch (error) {
+    console.error('Error fetching applications:', error);
+    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+
+// POST function to create a new application
 export async function POST(request: Request) {
   try {
     const body = await request.json();
