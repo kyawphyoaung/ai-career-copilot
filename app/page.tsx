@@ -23,8 +23,6 @@ export default function DashboardPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
-  const cvPreviewRef = useRef<HTMLDivElement>(null);
-
   const handleAppDetailsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const { name, value } = e.target;
       setAppDetails(prev => ({ ...prev, [name]: value }));
@@ -50,12 +48,15 @@ export default function DashboardPage() {
 
       const data = await response.json();
       setGeneratedCv(data);
-      // Pre-fill application details from generated data if possible
-      setAppDetails(prev => ({
-          ...prev,
-          jobTitle: data.experience?.[0]?.title || 'Software Engineer',
-          companyName: data.experience?.[0]?.company || ''
-      }))
+      
+      // *** NEW: Auto-fill the save form with AI-generated data ***
+      if (data.experience && data.experience.length > 0) {
+        setAppDetails(prev => ({
+            ...prev,
+            jobTitle: data.experience[0].title || 'Software Engineer',
+            companyName: data.experience[0].company || ''
+        }));
+      }
 
     } catch (err: any) {
       setError(err.message);
@@ -85,9 +86,6 @@ export default function DashboardPage() {
         if (!response.ok) throw new Error('Failed to save application');
 
         setSaveMessage('Application saved successfully!');
-        // Optionally clear the form after saving
-        // setGeneratedCv(null);
-        // setJobDescription('');
     } catch (err) {
         setSaveMessage('Error saving application.');
     } finally {
@@ -127,9 +125,8 @@ export default function DashboardPage() {
         {/* Right Panel: Output & Save */}
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col">
           <h2 className="text-xl font-semibold mb-4 text-white">2. Review & Save Application</h2>
-          <div className="flex-grow h-0"> {/* This is a trick to make child fill space */}
+          <div className="flex-grow h-0">
              <CvPreview 
-                ref={cvPreviewRef} 
                 cvData={generatedCv} 
                 onTemplateChange={setCvTheme} 
              />
@@ -137,20 +134,20 @@ export default function DashboardPage() {
           {generatedCv && (
             <div className="mt-4 pt-4 border-t border-gray-700">
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                    <input type="text" name="companyName" value={appDetails.companyName} onChange={handleAppDetailsChange} placeholder="Company Name" className="p-2 bg-gray-700 rounded border border-gray-600"/>
-                    <input type="text" name="jobTitle" value={appDetails.jobTitle} onChange={handleAppDetailsChange} placeholder="Job Title" className="p-2 bg-gray-700 rounded border border-gray-600"/>
-                    <select name="country" value={appDetails.country} onChange={handleAppDetailsChange} className="p-2 bg-gray-700 rounded border border-gray-600">
+                    <input type="text" name="companyName" value={appDetails.companyName} onChange={handleAppDetailsChange} placeholder="Company Name" className="p-2 bg-gray-700 rounded border border-gray-600 text-white"/>
+                    <input type="text" name="jobTitle" value={appDetails.jobTitle} onChange={handleAppDetailsChange} placeholder="Job Title" className="p-2 bg-gray-700 rounded border border-gray-600 text-white"/>
+                    <select name="country" value={appDetails.country} onChange={handleAppDetailsChange} className="p-2 bg-gray-700 rounded border border-gray-600 text-white">
                         <option>Singapore</option>
                         <option>Bangkok</option>
                         <option>Other</option>
                     </select>
-                     <select name="source" value={appDetails.source} onChange={handleAppDetailsChange} className="p-2 bg-gray-700 rounded border border-gray-600">
+                     <select name="source" value={appDetails.source} onChange={handleAppDetailsChange} className="p-2 bg-gray-700 rounded border border-gray-600 text-white">
                         <option>LinkedIn</option>
                         <option>Company Website</option>
                         <option>JobStreet</option>
                         <option>Email</option>
                     </select>
-                    <input type="email" name="contactEmail" value={appDetails.contactEmail} onChange={handleAppDetailsChange} placeholder="HR Email (Optional)" className="p-2 bg-gray-700 rounded border border-gray-600 col-span-2"/>
+                    <input type="email" name="contactEmail" value={appDetails.contactEmail} onChange={handleAppDetailsChange} placeholder="HR Email (Optional)" className="p-2 bg-gray-700 rounded border border-gray-600 col-span-2 text-white"/>
                 </div>
                 <button onClick={handleSaveApplication} disabled={isSaving} className="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-gray-500">
                     {isSaving ? 'Saving...' : 'Confirm & Save Application to History'}
@@ -163,3 +160,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
