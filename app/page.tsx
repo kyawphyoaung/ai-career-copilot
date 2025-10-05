@@ -32,6 +32,8 @@ export default function HomePage() {
   const [saveSuccessMessage, setSaveSuccessMessage] = useState("");
   const [skillAnalysis, setSkillAnalysis] = useState<{ match: number; required: string[]; missing: string[] } | null>(null);
   const [cvPdfFilename, setCvPdfFilename] = useState("");
+  const [userProfileId, setUserProfileId] = useState<string | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
 
   useEffect(() => {
@@ -67,6 +69,38 @@ export default function HomePage() {
     window.addEventListener('resize', calculateScale);
     return () => window.removeEventListener('resize', calculateScale);
   }, []);
+
+  useEffect(() => {
+    // 💡 ပြင်ဆင်မှု ၂: User Profile ID ကို /api/profile မှ Fetch လုပ်ခြင်း
+    const fetchUserProfileId = async () => {
+        setIsProfileLoading(true);
+        try {
+            // သင့်ရဲ့ /api/profile route က လက်ရှိ user ရဲ့ ID ကို ပြန်ပေးမယ်လို့ ယူဆပါတယ်။
+            const response = await fetch('/api/profile', { method: 'GET' });
+            if (response.ok) {
+                const data = await response.json();
+                // data.id သို့မဟုတ် data.userProfileId ဖြစ်နိုင်သည်ကို စစ်ဆေးပါ။
+                // ဤနေရာတွင် ID ကို String အဖြစ်သာ ယူဆထားပါသည်။
+                const id = data.id || data.userProfileId; 
+                if (id) {
+                    setUserProfileId(String(id));
+                    console.log("Fetched User Profile ID:", id);
+                } else {
+                    setError("User profile ID not available. Cannot proceed with CV generation.");
+                }
+            } else {
+                setError("Failed to fetch user profile data. (Is /api/profile set up?)");
+            }
+        } catch (err) {
+            console.error("Profile fetch error:", err);
+            setError("Network error while fetching user profile.");
+        } finally {
+            setIsProfileLoading(false);
+        }
+    };
+    fetchUserProfileId();
+  }, []); 
+
   
   const handleGenerateCommonCv = () => {
     const transformedCv = JSON.parse(JSON.stringify(sampleCvJson));
@@ -91,6 +125,13 @@ export default function HomePage() {
       setError("Job Description cannot be empty.");
       return;
     }
+
+     // userProfileId မရသေးရင် သို့မဟုတ် မရှိရင် ရပ်တန့်ပါ။
+    if (!userProfileId) {
+        setError("User profile is not loaded or ID is missing. Please refresh.");
+        return;
+    }
+
     setLoading(true);
     setError(null);
     setJsonText("");
@@ -100,7 +141,11 @@ export default function HomePage() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobDescription: jd, companyName, jobTitle }),
+        body: JSON.stringify({ 
+          jobDescription: jd, 
+          companyName, 
+          jobTitle,
+          userProfileId }),
       });
       if (!response.ok) throw new Error("Failed to generate CV.");
       const data = await response.json();
@@ -139,8 +184,8 @@ export default function HomePage() {
   };
 
   const handleSaveApplication = async () => {
-      if (!generatedCv) {
-          setError("No CV data to save.");
+      if (!generatedCv || !userProfileId) {
+          setError("No CV data or UserID to save.");
           return;
       }
       setLoading(true);
@@ -161,7 +206,7 @@ export default function HomePage() {
               skillMatchPercentage: skillAnalysis?.match || 0,
               requiredSkills: skillAnalysis?.required || [],
               missingSkills: skillAnalysis?.missing || [],
-              userProfileId: 1,
+              userProfileId: userProfileId,
               followUpDate: followUpDate,
           };
           const response = await fetch('/api/applications', {
@@ -206,12 +251,15 @@ export default function HomePage() {
             {error && <p className="text-red-500 mt-2">{error}</p>}
             <div className="flex gap-4 mt-2">
                 <button onClick={handleGenerateTailoredCv} disabled={loading} className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:bg-blue-400">
-                    {loading ? "Processing..." : "Generate Tailored CV (AI)"}
+                    {isProfileLoading ? "Loading Profile..." : loading ? "Processing..." : "Generate Tailored CV (AI)"}
                 </button>
                 <button onClick={handleGenerateCommonCv} disabled={loading} className="w-full bg-gray-600 text-white p-2 rounded hover:bg-gray-700 disabled:bg-gray-400">
                     Generate Common CV
                 </button>
             </div>
+            {!userProfileId && !isProfileLoading && (
+                 <p className="text-yellow-500 mt-2 text-sm">Cannot generate CV. User Profile ID is missing. (Is /api/profile correct?)</p>
+            )}
           </div>
           <div className="bg-[#2d2d2d] p-4 rounded-lg shadow flex-grow flex flex-col">
             <h2 className="text-lg font-semibold mb-2 text-gray-200">2. CV Data (JSON Editor)</h2>

@@ -6,7 +6,7 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 
-const MODEL_NAME = "gemini-1.0-pro";
+const MODEL_NAME = "gemini-2.5-flash";
 const API_KEY = process.env.GEMINI_API_KEY!;
 
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -41,7 +41,9 @@ export async function generateCvContentForUser(
   const result = await model.generateContent(prompt);
   const response = result.response;
   const text = response.text();
-  return JSON.parse(text);
+
+  const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  return JSON.parse(cleanedText);
 }
 
 // <<<<<<< အသစ်ထပ်တိုးထားသော Function >>>>>>>>>
