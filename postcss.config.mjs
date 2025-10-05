@@ -1,6 +1,6 @@
 // postcss.config.mjs
 
-/** @type {import('postcss-load-config').Config} */
+/** @type {import('postcss').AcceptedPlugin[]} */
 const config = {
   plugins: {
     tailwindcss: {},
@@ -8,4 +8,6 @@ const config = {
   },
 };
 
-module.exports = config;
+// Use `export default` for .mjs files (ES Modules)
+export default config;
+
