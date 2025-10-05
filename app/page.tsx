@@ -9,7 +9,7 @@ import "prismjs/components/prism-json";
 import CvPreview from "@/components/CvPreview";
 import { sampleCvJson } from "@/lib/sample-cv";
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 
 export default function HomePage() {
   const [jd, setJd] = useState("");
